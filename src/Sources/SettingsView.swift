@@ -514,6 +514,7 @@ struct SettingsView: View {
     @AppStorage(AppPreferences.gpt54ReasoningEffortKey) private var gpt54ReasoningEffort = AppPreferences.defaultGpt54ReasoningEffort
     @AppStorage(AppPreferences.gpt53CodexFastModeKey) private var gpt53CodexFastMode = AppPreferences.defaultGpt53CodexFastMode
     @AppStorage(AppPreferences.gpt54FastModeKey) private var gpt54FastMode = AppPreferences.defaultGpt54FastMode
+    @AppStorage(AppPreferences.codexImpersonationKey) private var codexImpersonation = AppPreferences.defaultCodexImpersonation
     @AppStorage(AppPreferences.gemini31ProThinkingLevelKey) private var gemini31ProThinkingLevel = AppPreferences.defaultGemini31ProThinkingLevel
     @AppStorage(AppPreferences.gemini3FlashThinkingLevelKey) private var gemini3FlashThinkingLevel = AppPreferences.defaultGemini3FlashThinkingLevel
     @AppStorage(AppPreferences.allowRemoteKey) private var allowRemote = AppPreferences.defaultAllowRemote
@@ -909,7 +910,7 @@ struct SettingsView: View {
                                         Toggle("Fast mode", isOn: $gpt53CodexFastMode)
                                             .toggleStyle(.checkbox)
                                             .font(.caption)
-                                            .help("Injects service_tier=priority for GPT 5.3 Codex Responses API requests (Codex fast mode)")
+                                            .help("Injects service_tier=priority — the same wire value Codex CLI's /fast command sends. Auto-enabled on Enterprise/Team plans, opt-in on Plus/Pro. The response will still report service_tier=default regardless of whether Fast was honored server-side.")
                                     }
                                     Picker("", selection: $gpt53CodexReasoningEffort) {
                                         ForEach(["low", "medium", "high", "xhigh"], id: \.self) { option in
@@ -930,7 +931,7 @@ struct SettingsView: View {
                                         Toggle("Fast mode", isOn: $gpt54FastMode)
                                             .toggleStyle(.checkbox)
                                             .font(.caption)
-                                            .help("Injects service_tier=priority for GPT 5.4 Responses API requests (Codex fast mode)")
+                                            .help("Injects service_tier=priority — the same wire value Codex CLI's /fast command sends. Auto-enabled on Enterprise/Team plans, opt-in on Plus/Pro. The response will still report service_tier=default regardless of whether Fast was honored server-side.")
                                     }
                                     Picker("", selection: $gpt54ReasoningEffort) {
                                         ForEach(["low", "medium", "high", "xhigh"], id: \.self) { option in
@@ -940,6 +941,14 @@ struct SettingsView: View {
                                     .pickerStyle(.segmented)
                                     .tint(codexEffortSelectionColor)
                                     .labelsHidden()
+                                }
+                                .padding(.vertical, 2)
+                                HStack {
+                                    Toggle("Impersonate Codex CLI", isOn: $codexImpersonation)
+                                        .toggleStyle(.checkbox)
+                                        .font(.caption)
+                                        .help("Rewrites User-Agent to codex_cli_rs/<ver> and adds originator + x-codex-installation-id headers on GPT-5.x Responses API requests, matching what Codex CLI sends. Required for first-party routing and may affect Fast Mode eligibility on the ChatGPT backend.")
+                                    Spacer()
                                 }
                                 .padding(.vertical, 2)
                             }

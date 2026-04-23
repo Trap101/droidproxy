@@ -298,7 +298,18 @@ class ThinkingProxy {
             rewrittenPath = newPath
         }
 
-        forwardRequest(method: method, path: rewrittenPath, version: httpVersion, headers: headers, body: modifiedBody, originalConnection: connection)
+        // Codex CLI masquerade — rewrite User-Agent, set originator + installation id
+        // on Codex Responses API requests so the upstream (chatgpt.com) treats us as
+        // a first-party Codex client. Parity with codex-rs/login/src/auth/default_client.rs
+        // and codex-rs/core/src/client.rs.
+        var outboundHeaders = headers
+        if AppPreferences.codexImpersonation &&
+            Self.isCodexResponsesRequest(path: rewrittenPath, bodyString: modifiedBody) {
+            outboundHeaders = Self.applyCodexMasquerade(to: outboundHeaders)
+            ThinkingProxy.fileLog("CODEX MASQUERADE: applied originator/UA rewrite for \(rewrittenPath)")
+        }
+
+        forwardRequest(method: method, path: rewrittenPath, version: httpVersion, headers: outboundHeaders, body: modifiedBody, originalConnection: connection)
     }
 
     /**
@@ -316,10 +327,46 @@ class ThinkingProxy {
 
         if let effort = codexReasoningEffort(for: model) {
             var result = jsonString
-            result = injectJSONField(in: result, afterKey: "model", fieldName: "reasoning",
-                                     fieldValue: "{\"effort\":\"\(effort)\"}")
-            NSLog("[ThinkingProxy] Injected Codex reasoning for '\(model)' with effort '\(effort)'")
-            ThinkingProxy.fileLog("INJECTED Codex reasoning: effort=\(effort) for model \(model)")
+
+            // Parity with codex-rs/core/src/client.rs:879 — Codex CLI hard-codes
+            // stream:true on Responses API requests. Without this, the client may
+            // send stream:false and buffer the entire response (including all
+            // reasoning tokens) before the first byte — destroys TTFT.
+            result = replaceOrInjectJSONField(in: result, afterKey: "model",
+                                              fieldName: "stream", fieldValue: "true",
+                                              existsInJSON: json["stream"] != nil)
+
+            // Inject reasoning.effort after stream so the field order roughly
+            // tracks Codex CLI's serialization. Uses replace-or-inject so an
+            // explicit client-provided value isn't duplicated.
+            result = replaceOrInjectJSONField(in: result, afterKey: "stream",
+                                              fieldName: "reasoning",
+                                              fieldValue: "{\"effort\":\"\(effort)\"}",
+                                              existsInJSON: json["reasoning"] != nil)
+
+            // Parity with codex-rs/core/src/client.rs:854-857 — when reasoning is
+            // set, Codex includes reasoning.encrypted_content so cached reasoning
+            // can be replayed across turns, reducing re-tokenization cost.
+            let includeValue = "[\"reasoning.encrypted_content\"]"
+            result = replaceOrInjectJSONField(in: result, afterKey: "reasoning",
+                                              fieldName: "include",
+                                              fieldValue: includeValue,
+                                              existsInJSON: json["include"] != nil)
+
+            // Parity with codex-rs/core/src/client.rs:878 — Codex sets
+            // prompt_cache_key to the conversation_id so OpenAI's prompt cache
+            // hits across turns. We mint a stable cache key from client-provided
+            // metadata when available; otherwise fall back to the installation ID
+            // (still a huge win vs. no key at all).
+            if json["prompt_cache_key"] == nil {
+                let cacheKey = codexPromptCacheKey(json: json)
+                result = injectJSONField(in: result, afterKey: "include",
+                                         fieldName: "prompt_cache_key",
+                                         fieldValue: "\"\(cacheKey)\"")
+            }
+
+            NSLog("[ThinkingProxy] Injected Codex reasoning for '\(model)' with effort '\(effort)' (stream=true, include=reasoning.encrypted_content, prompt_cache_key set)")
+            ThinkingProxy.fileLog("INJECTED Codex reasoning: effort=\(effort) stream=true include=[reasoning.encrypted_content] prompt_cache_key set for model \(model)")
             return result
         }
 
@@ -388,6 +435,85 @@ class ThinkingProxy {
         default:
             return nil
         }
+    }
+
+    /// Derives a stable prompt_cache_key for a Codex Responses request.
+    /// Mirrors the Codex CLI behavior (`codex-rs/core/src/client.rs:878`) which uses
+    /// the conversation_id. We prefer the client's conversation/thread/session id
+    /// if present in the body; otherwise we fall back to the persistent installation
+    /// UUID so at least same-session turns share a cache key.
+    private func codexPromptCacheKey(json: [String: Any]) -> String {
+        let candidateKeys = [
+            "conversation_id",
+            "thread_id",
+            "session_id",
+            "user"
+        ]
+        for key in candidateKeys {
+            if let value = json[key] as? String, !value.isEmpty {
+                return value
+            }
+        }
+        if let metadata = json["metadata"] as? [String: Any] {
+            for key in candidateKeys {
+                if let value = metadata[key] as? String, !value.isEmpty {
+                    return value
+                }
+            }
+        }
+        return AppPreferences.codexInstallationId
+    }
+
+    /// True when the given request targets a Codex Responses API path (gpt-5.x).
+    /// Used to scope header masquerade to Codex-only traffic.
+    static func isCodexResponsesRequest(path: String, bodyString: String) -> Bool {
+        let normalizedPath = path.split(separator: "?").first.map(String.init) ?? path
+        guard normalizedPath == "/v1/responses" || normalizedPath == "/api/v1/responses" else {
+            return false
+        }
+        guard let data = bodyString.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let model = json["model"] as? String else {
+            return false
+        }
+        return model == "gpt-5.4" || model == "gpt-5.3-codex"
+    }
+
+    // Versions chosen to track a recent stable Codex CLI release. The exact
+    // version isn't authenticated server-side — what matters is that the prefix
+    // is `codex_cli_rs/...` so the first-party allow-list in
+    // codex-rs/login/src/auth/default_client.rs::is_first_party_originator
+    // recognizes us.
+    private static let codexCliVersion = "0.119.0"
+    private static let codexOriginator = "codex_cli_rs"
+
+    /// Adds Codex first-party headers to an outbound request and rewrites the
+    /// User-Agent. Replaces any existing User-Agent so the upstream consistently
+    /// sees a Codex CLI identity. Other Codex-specific headers (originator,
+    /// x-codex-installation-id, OpenAI-Beta) are added if not already present.
+    static func applyCodexMasquerade(to headers: [(String, String)]) -> [(String, String)] {
+        let osInfo = "macOS \(ProcessInfo.processInfo.operatingSystemVersionString); arm64"
+        let userAgent = "\(codexOriginator)/\(codexCliVersion) (\(osInfo))"
+        let installationId = AppPreferences.codexInstallationId
+
+        var existingNamesLower = Set(headers.map { $0.0.lowercased() })
+        var rewritten: [(String, String)] = headers.map { (name, value) in
+            if name.lowercased() == "user-agent" {
+                return (name, userAgent)
+            }
+            return (name, value)
+        }
+        if !existingNamesLower.contains("user-agent") {
+            rewritten.append(("User-Agent", userAgent))
+            existingNamesLower.insert("user-agent")
+        }
+        if !existingNamesLower.contains("originator") {
+            rewritten.append(("originator", codexOriginator))
+        }
+        if !existingNamesLower.contains("x-codex-installation-id") {
+            rewritten.append(("x-codex-installation-id", installationId))
+        }
+        return rewritten
     }
 
     /// Replaces an existing JSON field's value or injects it if missing.

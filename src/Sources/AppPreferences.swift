@@ -9,6 +9,8 @@ enum AppPreferences {
     static let gpt54ReasoningEffortKey = "gpt54ReasoningEffort"
     static let gpt53CodexFastModeKey = "gpt53CodexFastMode"
     static let gpt54FastModeKey = "gpt54FastMode"
+    static let codexImpersonationKey = "codexImpersonation"
+    static let codexInstallationIdKey = "codexInstallationId"
     static let gemini31ProThinkingLevelKey = "gemini31ProThinkingLevel"
     static let gemini3FlashThinkingLevelKey = "gemini3FlashThinkingLevel"
     static let claudeMaxBudgetModeKey = "claudeMaxBudgetMode"
@@ -24,6 +26,7 @@ enum AppPreferences {
     static let defaultGpt54ReasoningEffort = "high"
     static let defaultGpt53CodexFastMode = false
     static let defaultGpt54FastMode = false
+    static let defaultCodexImpersonation = true
     static let defaultGemini31ProThinkingLevel = "high"
     static let defaultGemini3FlashThinkingLevel = "high"
     static let defaultClaudeMaxBudgetMode = false
@@ -76,6 +79,31 @@ enum AppPreferences {
 
     static var gpt54FastMode: Bool {
         UserDefaults.standard.bool(forKey: gpt54FastModeKey)
+    }
+
+    /// When enabled, DroidProxy rewrites the User-Agent and originator headers on
+    /// Codex Responses API requests to look like Codex CLI (`codex_cli_rs`).
+    /// This matches the first-party allow-list in `codex-rs/login/src/auth/default_client.rs`
+    /// and may affect server-side routing/tier eligibility.
+    static var codexImpersonation: Bool {
+        let defaults = UserDefaults.standard
+        guard defaults.object(forKey: codexImpersonationKey) != nil else {
+            return defaultCodexImpersonation
+        }
+        return defaults.bool(forKey: codexImpersonationKey)
+    }
+
+    /// Stable installation ID used for Codex `x-codex-installation-id` and
+    /// `client_metadata`. Generated once per machine and persisted in UserDefaults.
+    static var codexInstallationId: String {
+        let defaults = UserDefaults.standard
+        if let existing = defaults.string(forKey: codexInstallationIdKey),
+           !existing.isEmpty {
+            return existing
+        }
+        let fresh = UUID().uuidString.lowercased()
+        defaults.set(fresh, forKey: codexInstallationIdKey)
+        return fresh
     }
 
     static var gemini31ProThinkingLevel: String {
