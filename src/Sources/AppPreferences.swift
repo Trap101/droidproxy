@@ -15,11 +15,16 @@ enum AppPreferences {
     static let codexInstallationIdKey = "codexInstallationId"
     static let gemini31ProThinkingLevelKey = "gemini31ProThinkingLevel"
     static let gemini3FlashThinkingLevelKey = "gemini3FlashThinkingLevel"
+    static let k26ReasoningEnabledKey = "k26ReasoningEnabled"
     static let claudeMaxBudgetModeKey = "claudeMaxBudgetMode"
     static let allowRemoteKey = "allowRemote"
     static let secretKeyKey = "secretKey"
     static let oledThemeKey = "oledTheme"
+    static let factoryAdvancedModelsKey = "factoryAdvancedModels"
+    static let backgroundOpacityKey = "backgroundOpacity"
     static let defaultOledTheme = false
+    static let defaultFactoryAdvancedModels = false
+    static let defaultBackgroundOpacity = 0.55
     static let defaultOpus47ThinkingEffort = "xhigh"
     static let defaultOpus46ThinkingEffort = "max"
     static let defaultOpus45ThinkingEffort = "high"
@@ -33,9 +38,26 @@ enum AppPreferences {
     static let defaultCodexImpersonation = true
     static let defaultGemini31ProThinkingLevel = "high"
     static let defaultGemini3FlashThinkingLevel = "high"
+    static let defaultK26ReasoningEnabled = true
     static let defaultClaudeMaxBudgetMode = false
     static let defaultAllowRemote = false
     static let defaultSecretKey = ""
+    static let showUsageInMenuBarKey = "showUsageInMenuBar"
+    static let usageAutoRefreshSecondsKey = "usageAutoRefreshSeconds"
+    static let defaultShowUsageInMenuBar = true
+    static let defaultUsageAutoRefreshSeconds = 300
+
+    static var showUsageInMenuBar: Bool {
+        let defaults = UserDefaults.standard
+        guard defaults.object(forKey: showUsageInMenuBarKey) != nil else { return defaultShowUsageInMenuBar }
+        return defaults.bool(forKey: showUsageInMenuBarKey)
+    }
+
+    static var usageAutoRefreshSeconds: Int {
+        let defaults = UserDefaults.standard
+        guard defaults.object(forKey: usageAutoRefreshSecondsKey) != nil else { return defaultUsageAutoRefreshSeconds }
+        return defaults.integer(forKey: usageAutoRefreshSecondsKey)
+    }
 
     static var opus47ThinkingEffort: String {
         let defaults = UserDefaults.standard
@@ -136,6 +158,20 @@ enum AppPreferences {
             return defaultGemini3FlashThinkingLevel
         }
         return defaults.string(forKey: gemini3FlashThinkingLevelKey) ?? defaultGemini3FlashThinkingLevel
+    }
+
+    static var k26ReasoningEnabled: Bool {
+        let defaults = UserDefaults.standard
+        guard defaults.object(forKey: k26ReasoningEnabledKey) != nil else {
+            return defaultK26ReasoningEnabled
+        }
+        return defaults.bool(forKey: k26ReasoningEnabledKey)
+    }
+
+    static var backgroundOpacity: Double {
+        let defaults = UserDefaults.standard
+        guard defaults.object(forKey: backgroundOpacityKey) != nil else { return defaultBackgroundOpacity }
+        return defaults.double(forKey: backgroundOpacityKey)
     }
 
     static var claudeMaxBudgetMode: Bool {
