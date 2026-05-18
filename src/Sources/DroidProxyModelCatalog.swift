@@ -157,6 +157,18 @@ enum DroidProxyModelCatalog {
             levels: codexLevels
         ),
         DroidProxyModelDefinition(
+            baseModel: "gpt-5.3-codex-spark",
+            idSlug: "gpt-5.3-codex-spark",
+            displayName: "GPT 5.3 Codex Spark",
+            maxOutputTokens: 128000,
+            provider: "openai",
+            providerKey: "codex",
+            baseURL: "http://localhost:8317/v1",
+            kind: .codex,
+            levelLabel: "Reasoning",
+            levels: codexLevels
+        ),
+        DroidProxyModelDefinition(
             baseModel: "gpt-5.4",
             idSlug: "gpt-5.4",
             displayName: "GPT 5.4",

@@ -6,9 +6,11 @@ enum AppPreferences {
     static let opus45ThinkingEffortKey = "opus45ThinkingEffort"
     static let sonnet46ThinkingEffortKey = "sonnet46ThinkingEffort"
     static let gpt53CodexReasoningEffortKey = "gpt53CodexReasoningEffort"
+    static let gpt53CodexSparkReasoningEffortKey = "gpt53CodexSparkReasoningEffort"
     static let gpt54ReasoningEffortKey = "gpt54ReasoningEffort"
     static let gpt55ReasoningEffortKey = "gpt55ReasoningEffort"
     static let gpt53CodexFastModeKey = "gpt53CodexFastMode"
+    static let gpt53CodexSparkFastModeKey = "gpt53CodexSparkFastMode"
     static let gpt54FastModeKey = "gpt54FastMode"
     static let gpt55FastModeKey = "gpt55FastMode"
     static let codexImpersonationKey = "codexImpersonation"
@@ -30,9 +32,11 @@ enum AppPreferences {
     static let defaultOpus45ThinkingEffort = "high"
     static let defaultSonnet46ThinkingEffort = "high"
     static let defaultGpt53CodexReasoningEffort = "high"
+    static let defaultGpt53CodexSparkReasoningEffort = "high"
     static let defaultGpt54ReasoningEffort = "high"
     static let defaultGpt55ReasoningEffort = "high"
     static let defaultGpt53CodexFastMode = false
+    static let defaultGpt53CodexSparkFastMode = false
     static let defaultGpt54FastMode = false
     static let defaultGpt55FastMode = false
     static let defaultCodexImpersonation = true
@@ -95,6 +99,14 @@ enum AppPreferences {
         return defaults.string(forKey: gpt53CodexReasoningEffortKey) ?? defaultGpt53CodexReasoningEffort
     }
 
+    static var gpt53CodexSparkReasoningEffort: String {
+        let defaults = UserDefaults.standard
+        guard defaults.object(forKey: gpt53CodexSparkReasoningEffortKey) != nil else {
+            return defaultGpt53CodexSparkReasoningEffort
+        }
+        return defaults.string(forKey: gpt53CodexSparkReasoningEffortKey) ?? defaultGpt53CodexSparkReasoningEffort
+    }
+
     static var gpt54ReasoningEffort: String {
         let defaults = UserDefaults.standard
         guard defaults.object(forKey: gpt54ReasoningEffortKey) != nil else {
@@ -113,6 +125,10 @@ enum AppPreferences {
 
     static var gpt53CodexFastMode: Bool {
         UserDefaults.standard.bool(forKey: gpt53CodexFastModeKey)
+    }
+
+    static var gpt53CodexSparkFastMode: Bool {
+        UserDefaults.standard.bool(forKey: gpt53CodexSparkFastModeKey)
     }
 
     static var gpt54FastMode: Bool {

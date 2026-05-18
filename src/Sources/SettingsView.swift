@@ -512,10 +512,12 @@ struct SettingsView: View {
     @AppStorage(AppPreferences.sonnet46ThinkingEffortKey) private var sonnet46ThinkingEffort = AppPreferences.defaultSonnet46ThinkingEffort
     @AppStorage(AppPreferences.gpt52ReasoningEffortKey) private var gpt52ReasoningEffort = AppPreferences.defaultGpt52ReasoningEffort
     @AppStorage(AppPreferences.gpt53CodexReasoningEffortKey) private var gpt53CodexReasoningEffort = AppPreferences.defaultGpt53CodexReasoningEffort
+    @AppStorage(AppPreferences.gpt53CodexSparkReasoningEffortKey) private var gpt53CodexSparkReasoningEffort = AppPreferences.defaultGpt53CodexSparkReasoningEffort
     @AppStorage(AppPreferences.gpt54ReasoningEffortKey) private var gpt54ReasoningEffort = AppPreferences.defaultGpt54ReasoningEffort
     @AppStorage(AppPreferences.gpt55ReasoningEffortKey) private var gpt55ReasoningEffort = AppPreferences.defaultGpt55ReasoningEffort
     @AppStorage(AppPreferences.gpt52FastModeKey) private var gpt52FastMode = AppPreferences.defaultGpt52FastMode
     @AppStorage(AppPreferences.gpt53CodexFastModeKey) private var gpt53CodexFastMode = AppPreferences.defaultGpt53CodexFastMode
+    @AppStorage(AppPreferences.gpt53CodexSparkFastModeKey) private var gpt53CodexSparkFastMode = AppPreferences.defaultGpt53CodexSparkFastMode
     @AppStorage(AppPreferences.gpt54FastModeKey) private var gpt54FastMode = AppPreferences.defaultGpt54FastMode
     @AppStorage(AppPreferences.gpt55FastModeKey) private var gpt55FastMode = AppPreferences.defaultGpt55FastMode
     @AppStorage(AppPreferences.codexImpersonationKey) private var codexImpersonation = AppPreferences.defaultCodexImpersonation
@@ -990,6 +992,11 @@ struct SettingsView: View {
                                         helpText: "Injects service_tier=priority for GPT 5.3 Codex Responses API requests (Codex fast mode)"
                                     )
                                     codexFastModeToggleRow(
+                                        "GPT 5.3 Codex Spark",
+                                        isOn: $gpt53CodexSparkFastMode,
+                                        helpText: "Injects service_tier=priority for GPT 5.3 Codex Spark Responses API requests (Spark runs on Cerebras; priority tier may be ignored upstream)"
+                                    )
+                                    codexFastModeToggleRow(
                                         "GPT 5.4",
                                         isOn: $gpt54FastMode,
                                         helpText: "Injects service_tier=priority for GPT 5.4 Responses API requests (Codex fast mode)"
@@ -1009,6 +1016,11 @@ struct SettingsView: View {
                                         "GPT 5.3 Codex",
                                         effortSelection: $gpt53CodexReasoningEffort,
                                         fastMode: $gpt53CodexFastMode
+                                    )
+                                    codexReasoningEffortRow(
+                                        "GPT 5.3 Codex Spark",
+                                        effortSelection: $gpt53CodexSparkReasoningEffort,
+                                        fastMode: $gpt53CodexSparkFastMode
                                     )
                                     codexReasoningEffortRow(
                                         "GPT 5.4",

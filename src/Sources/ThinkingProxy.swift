@@ -18,6 +18,8 @@ import Network
    `redact-thinking-2026-02-12`, otherwise Claude emits only signed empty thinking blocks.
  - Requests whose `model` is exactly `gpt-5.3-codex` receive `reasoning: {"effort":"..."}`
    from `AppPreferences.gpt53CodexReasoningEffort`
+ - Requests whose `model` is exactly `gpt-5.3-codex-spark` receive `reasoning: {"effort":"..."}`
+   from `AppPreferences.gpt53CodexSparkReasoningEffort`
 - Requests whose `model` is exactly `gpt-5.2`, `gpt-5.4`, or `gpt-5.5` receive
   `reasoning: {"effort":"..."}` from `AppPreferences.gpt52ReasoningEffort`,
   `AppPreferences.gpt54ReasoningEffort`, or `AppPreferences.gpt55ReasoningEffort`
@@ -572,6 +574,8 @@ class ThinkingProxy {
             return AppPreferences.gpt52ReasoningEffort
         case "gpt-5.3-codex":
             return AppPreferences.gpt53CodexReasoningEffort
+        case "gpt-5.3-codex-spark":
+            return AppPreferences.gpt53CodexSparkReasoningEffort
         case "gpt-5.4":
             return AppPreferences.gpt54ReasoningEffort
         case "gpt-5.5":
@@ -620,7 +624,7 @@ class ThinkingProxy {
               let model = json["model"] as? String else {
             return false
         }
-        return model == "gpt-5.4" || model == "gpt-5.5" || model == "gpt-5.3-codex"
+        return model == "gpt-5.4" || model == "gpt-5.5" || model == "gpt-5.3-codex" || model == "gpt-5.3-codex-spark"
     }
 
     // Versions chosen to track a recent stable Codex CLI release. The exact
@@ -1137,6 +1141,8 @@ class ThinkingProxy {
             guard AppPreferences.gpt55FastMode else { return nil }
         case "gpt-5.3-codex":
             guard AppPreferences.gpt53CodexFastMode else { return nil }
+        case "gpt-5.3-codex-spark":
+            guard AppPreferences.gpt53CodexSparkFastMode else { return nil }
         default:
             return nil
         }
