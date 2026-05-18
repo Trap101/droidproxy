@@ -510,9 +510,11 @@ struct SettingsView: View {
     @AppStorage(AppPreferences.opus46ThinkingEffortKey) private var opus46ThinkingEffort = AppPreferences.defaultOpus46ThinkingEffort
     @AppStorage(AppPreferences.opus45ThinkingEffortKey) private var opus45ThinkingEffort = AppPreferences.defaultOpus45ThinkingEffort
     @AppStorage(AppPreferences.sonnet46ThinkingEffortKey) private var sonnet46ThinkingEffort = AppPreferences.defaultSonnet46ThinkingEffort
+    @AppStorage(AppPreferences.gpt52ReasoningEffortKey) private var gpt52ReasoningEffort = AppPreferences.defaultGpt52ReasoningEffort
     @AppStorage(AppPreferences.gpt53CodexReasoningEffortKey) private var gpt53CodexReasoningEffort = AppPreferences.defaultGpt53CodexReasoningEffort
     @AppStorage(AppPreferences.gpt54ReasoningEffortKey) private var gpt54ReasoningEffort = AppPreferences.defaultGpt54ReasoningEffort
     @AppStorage(AppPreferences.gpt55ReasoningEffortKey) private var gpt55ReasoningEffort = AppPreferences.defaultGpt55ReasoningEffort
+    @AppStorage(AppPreferences.gpt52FastModeKey) private var gpt52FastMode = AppPreferences.defaultGpt52FastMode
     @AppStorage(AppPreferences.gpt53CodexFastModeKey) private var gpt53CodexFastMode = AppPreferences.defaultGpt53CodexFastMode
     @AppStorage(AppPreferences.gpt54FastModeKey) private var gpt54FastMode = AppPreferences.defaultGpt54FastMode
     @AppStorage(AppPreferences.gpt55FastModeKey) private var gpt55FastMode = AppPreferences.defaultGpt55FastMode
@@ -738,7 +740,7 @@ struct SettingsView: View {
                                 .font(.caption)
                         }
                         .buttonStyle(.plain)
-                        .help("Installs three devil's advocate code reviewer droids (Opus 4.7, GPT 5.4, Gemini 3.1 Pro) and their slash commands into your Factory config. Use /challenge-opus, /challenge-gpt, or /challenge-gemini in any Droid session for a cross-model second opinion on your code.")
+                        .help("Installs three devil's advocate code reviewer droids (Opus 4.7, GPT 5.2, Gemini 3.1 Pro) and their slash commands into your Factory config. Use /challenge-opus, /challenge-gpt, or /challenge-gemini in any Droid session for a cross-model second opinion on your code.")
                         Spacer()
                         if challengerPluginInstalled {
                             HStack(spacing: 4) {
@@ -978,6 +980,11 @@ struct SettingsView: View {
                                 if factoryAdvancedModels {
                                     advancedFactoryModelsNotice("Codex")
                                     codexFastModeToggleRow(
+                                        "GPT 5.2",
+                                        isOn: $gpt52FastMode,
+                                        helpText: "Injects service_tier=priority for GPT 5.2 Responses API requests (Codex fast mode)"
+                                    )
+                                    codexFastModeToggleRow(
                                         "GPT 5.3 Codex",
                                         isOn: $gpt53CodexFastMode,
                                         helpText: "Injects service_tier=priority for GPT 5.3 Codex Responses API requests (Codex fast mode)"
@@ -993,69 +1000,26 @@ struct SettingsView: View {
                                         helpText: "Injects service_tier=priority for GPT 5.5 Responses API requests (Codex fast mode)"
                                     )
                                 } else {
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        HStack {
-                                            Text("GPT 5.3 Codex reasoning effort")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                            Spacer()
-                                            Toggle("Fast mode", isOn: $gpt53CodexFastMode)
-                                                .toggleStyle(.checkbox)
-                                                .font(.caption)
-                                                .help("Injects service_tier=priority for GPT 5.3 Codex Responses API requests (Codex fast mode)")
-                                        }
-                                        Picker("", selection: $gpt53CodexReasoningEffort) {
-                                            ForEach(["low", "medium", "high", "xhigh"], id: \.self) { option in
-                                                Text(option).tag(option)
-                                            }
-                                        }
-                                        .pickerStyle(.segmented)
-                                        .tint(codexEffortSelectionColor)
-                                        .labelsHidden()
-                                    }
-                                    .padding(.vertical, 2)
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        HStack {
-                                            Text("GPT 5.4 reasoning effort")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                            Spacer()
-                                            Toggle("Fast mode", isOn: $gpt54FastMode)
-                                                .toggleStyle(.checkbox)
-                                                .font(.caption)
-                                                .help("Injects service_tier=priority for GPT 5.4 Responses API requests (Codex fast mode)")
-                                        }
-                                        Picker("", selection: $gpt54ReasoningEffort) {
-                                            ForEach(["low", "medium", "high", "xhigh"], id: \.self) { option in
-                                                Text(option).tag(option)
-                                            }
-                                        }
-                                        .pickerStyle(.segmented)
-                                        .tint(codexEffortSelectionColor)
-                                        .labelsHidden()
-                                    }
-                                    .padding(.vertical, 2)
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        HStack {
-                                            Text("GPT 5.5 reasoning effort")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                            Spacer()
-                                            Toggle("Fast mode", isOn: $gpt55FastMode)
-                                                .toggleStyle(.checkbox)
-                                                .font(.caption)
-                                                .help("Injects service_tier=priority for GPT 5.5 Responses API requests (Codex fast mode)")
-                                        }
-                                        Picker("", selection: $gpt55ReasoningEffort) {
-                                            ForEach(["low", "medium", "high", "xhigh"], id: \.self) { option in
-                                                Text(option).tag(option)
-                                            }
-                                        }
-                                        .pickerStyle(.segmented)
-                                        .tint(codexEffortSelectionColor)
-                                        .labelsHidden()
-                                    }
-                                    .padding(.vertical, 2)
+                                    codexReasoningEffortRow(
+                                        "GPT 5.2",
+                                        effortSelection: $gpt52ReasoningEffort,
+                                        fastMode: $gpt52FastMode
+                                    )
+                                    codexReasoningEffortRow(
+                                        "GPT 5.3 Codex",
+                                        effortSelection: $gpt53CodexReasoningEffort,
+                                        fastMode: $gpt53CodexFastMode
+                                    )
+                                    codexReasoningEffortRow(
+                                        "GPT 5.4",
+                                        effortSelection: $gpt54ReasoningEffort,
+                                        fastMode: $gpt54FastMode
+                                    )
+                                    codexReasoningEffortRow(
+                                        "GPT 5.5",
+                                        effortSelection: $gpt55ReasoningEffort,
+                                        fastMode: $gpt55FastMode
+                                    )
                                 }
                                 HStack {
                                     Toggle("Impersonate Codex CLI", isOn: $codexImpersonation)
@@ -1290,6 +1254,35 @@ struct SettingsView: View {
                 .toggleStyle(.checkbox)
                 .font(.caption)
                 .help(helpText)
+        }
+        .padding(.vertical, 2)
+    }
+
+    @ViewBuilder
+    private func codexReasoningEffortRow(
+        _ title: String,
+        effortSelection: Binding<String>,
+        fastMode: Binding<Bool>
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("\(title) reasoning effort")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Toggle("Fast mode", isOn: fastMode)
+                    .toggleStyle(.checkbox)
+                    .font(.caption)
+                    .help("Injects service_tier=priority for \(title) Responses API requests (Codex fast mode)")
+            }
+            Picker("", selection: effortSelection) {
+                ForEach(["low", "medium", "high", "xhigh"], id: \.self) { option in
+                    Text(option).tag(option)
+                }
+            }
+            .pickerStyle(.segmented)
+            .tint(codexEffortSelectionColor)
+            .labelsHidden()
         }
         .padding(.vertical, 2)
     }
@@ -1636,7 +1629,7 @@ struct SettingsView: View {
         ---
         name: challenger-gpt
         description: Devil's advocate code reviewer that challenges decisions, critiques patterns, and suggests better alternatives. Use when you want a tough second opinion on code, architecture, or design choices.
-        model: custom:droidproxy:gpt-5.5
+        model: custom:droidproxy:gpt-5.2
         tools: ["Read", "LS", "Grep", "Glob", "WebSearch", "FetchUrl"]
         ---
 
@@ -1768,7 +1761,7 @@ struct SettingsView: View {
         if factoryAdvancedModels {
             rendered = rendered
                 .replacingOccurrences(of: "model: custom:droidproxy:opus-4-7", with: "model: custom:droidproxy:opus-4-7-xhigh")
-                .replacingOccurrences(of: "model: custom:droidproxy:gpt-5.5", with: "model: custom:droidproxy:gpt-5.5-high")
+                .replacingOccurrences(of: "model: custom:droidproxy:gpt-5.2", with: "model: custom:droidproxy:gpt-5.2-high")
                 .replacingOccurrences(of: "model: custom:droidproxy:gemini-3.1-pro", with: "model: custom:droidproxy:gemini-3.1-pro-high")
         }
 

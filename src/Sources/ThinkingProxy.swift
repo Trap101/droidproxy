@@ -5,7 +5,7 @@ import Network
  A lightweight HTTP proxy that injects reasoning settings for supported Claude and Codex GPT models.
 
  Current behavior:
- - Requests whose `model` contains `opus-4-7` receive `thinking: {"type":"adaptive"}`
+ - Requests whose `model` contains `opus-4-7` receive `thinking: {"type":"adaptive","display":"summarized"}`
    plus `output_config.effort` from `AppPreferences.opus47ThinkingEffort`
  - Requests whose `model` contains `opus-4-6` receive `thinking: {"type":"adaptive"}`
    plus `output_config.effort` from `AppPreferences.opus46ThinkingEffort`
@@ -14,10 +14,13 @@ import Network
    `AppPreferences.opus45ThinkingEffort` (Opus 4.5 does not support adaptive thinking).
  - Requests whose `model` contains `sonnet-4-6` receive `thinking: {"type":"adaptive"}`
    plus `output_config.effort` from `AppPreferences.sonnet46ThinkingEffort`
+ - Claude requests with thinking enabled forward an Anthropic-Beta header that omits
+   `redact-thinking-2026-02-12`, otherwise Claude emits only signed empty thinking blocks.
  - Requests whose `model` is exactly `gpt-5.3-codex` receive `reasoning: {"effort":"..."}`
    from `AppPreferences.gpt53CodexReasoningEffort`
-- Requests whose `model` is exactly `gpt-5.4` or `gpt-5.5` receive `reasoning: {"effort":"..."}`
-  from `AppPreferences.gpt54ReasoningEffort` or `AppPreferences.gpt55ReasoningEffort`
+- Requests whose `model` is exactly `gpt-5.2`, `gpt-5.4`, or `gpt-5.5` receive
+  `reasoning: {"effort":"..."}` from `AppPreferences.gpt52ReasoningEffort`,
+  `AppPreferences.gpt54ReasoningEffort`, or `AppPreferences.gpt55ReasoningEffort`
 - Other models are forwarded unchanged
 - Requests whose `model` is exactly `kimi-k2.6` receive `reasoning: {"effort":"..."}`
   from `AppPreferences.k26ReasoningEffort`
@@ -54,6 +57,17 @@ class ThinkingProxy {
 
     private enum Config {
         static let anthropicVersion = "2023-06-01"
+        static let claudeRedactedThinkingBeta = "redact-thinking-2026-02-12"
+        static let claudeVisibleThinkingBetas = [
+            "claude-code-20250219",
+            "oauth-2025-04-20",
+            "interleaved-thinking-2025-05-14",
+            "context-management-2025-06-27",
+            "prompt-caching-scope-2026-01-05",
+            "structured-outputs-2025-12-15",
+            "fast-mode-2026-02-01",
+            "token-efficient-tools-2026-03-28"
+        ]
     }
     
     /**
@@ -300,11 +314,12 @@ class ThinkingProxy {
             rewrittenPath = newPath
         }
 
+        var outboundHeaders = headersForForwarding(headers, bodyString: modifiedBody)
+
         // Codex CLI masquerade — rewrite User-Agent, set originator + installation id
         // on Codex Responses API requests so the upstream (chatgpt.com) treats us as
         // a first-party Codex client. Parity with codex-rs/login/src/auth/default_client.rs
         // and codex-rs/core/src/client.rs.
-        var outboundHeaders = headers
         if AppPreferences.codexImpersonation &&
             Self.isCodexResponsesRequest(path: rewrittenPath, bodyString: modifiedBody) {
             outboundHeaders = Self.applyCodexMasquerade(to: outboundHeaders)
@@ -312,6 +327,70 @@ class ThinkingProxy {
         }
 
         forwardRequest(method: method, path: rewrittenPath, version: httpVersion, headers: outboundHeaders, body: modifiedBody, originalConnection: connection)
+    }
+
+    private func headersForForwarding(_ headers: [(String, String)], bodyString: String) -> [(String, String)] {
+        guard shouldRequestVisibleClaudeThinking(bodyString: bodyString) else {
+            return headers
+        }
+
+        ThinkingProxy.fileLog("CLAUDE visible thinking enabled: removing \(Config.claudeRedactedThinkingBeta) from Anthropic-Beta")
+        return headersWithVisibleClaudeThinkingBetas(headers)
+    }
+
+    private func shouldRequestVisibleClaudeThinking(bodyString: String) -> Bool {
+        guard let jsonData = bodyString.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+              let model = json["model"] as? String,
+              isClaudeModel(model),
+              let thinking = json["thinking"] as? [String: Any],
+              let thinkingType = thinking["type"] as? String else {
+            return false
+        }
+
+        switch thinkingType {
+        case "enabled", "adaptive", "auto":
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func isClaudeModel(_ model: String) -> Bool {
+        model.starts(with: "claude-") || model.starts(with: "gemini-claude-")
+    }
+
+    private func headersWithVisibleClaudeThinkingBetas(_ headers: [(String, String)]) -> [(String, String)] {
+        var forwardedHeaders: [(String, String)] = []
+        var betaCandidates: [String] = []
+
+        for (name, value) in headers {
+            if name.caseInsensitiveCompare("anthropic-beta") == .orderedSame {
+                betaCandidates.append(contentsOf: parseAnthropicBetas(value))
+                continue
+            }
+            forwardedHeaders.append((name, value))
+        }
+
+        betaCandidates.append(contentsOf: Config.claudeVisibleThinkingBetas)
+
+        var seen = Set<String>()
+        let visibleBetas = betaCandidates.compactMap { rawBeta -> String? in
+            let beta = rawBeta.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !beta.isEmpty else { return nil }
+            let normalizedBeta = beta.lowercased()
+            guard normalizedBeta != Config.claudeRedactedThinkingBeta else { return nil }
+            guard !seen.contains(normalizedBeta) else { return nil }
+            seen.insert(normalizedBeta)
+            return beta
+        }
+
+        forwardedHeaders.append(("Anthropic-Beta", visibleBetas.joined(separator: ",")))
+        return forwardedHeaders
+    }
+
+    private func parseAnthropicBetas(_ value: String) -> [String] {
+        value.split(separator: ",").map { String($0) }
     }
 
     /**
@@ -471,8 +550,11 @@ class ThinkingProxy {
             NSLog("[ThinkingProxy] Injected classic budget_tokens max mode for '\(model)' budget=\(budgetTokens) max_tokens=\(maxTokens)")
             ThinkingProxy.fileLog("INJECTED classic budget_tokens max mode: budget_tokens=\(budgetTokens) max_tokens=\(maxTokens) for model \(model)")
         } else {
+            let thinkingValue = isOpus47Model(model)
+                ? "{\"type\":\"adaptive\",\"display\":\"summarized\"}"
+                : "{\"type\":\"adaptive\"}"
             result = replaceOrInjectJSONField(in: result, afterKey: "model", fieldName: "thinking",
-                                              fieldValue: "{\"type\":\"adaptive\"}",
+                                              fieldValue: thinkingValue,
                                               existsInJSON: json["thinking"] != nil)
             result = replaceOrInjectJSONField(in: result, afterKey: "thinking", fieldName: "output_config",
                                               fieldValue: "{\"effort\":\"\(effort)\"}",
@@ -486,6 +568,8 @@ class ThinkingProxy {
 
     private func codexReasoningEffort(for model: String) -> String? {
         switch model {
+        case "gpt-5.2":
+            return AppPreferences.gpt52ReasoningEffort
         case "gpt-5.3-codex":
             return AppPreferences.gpt53CodexReasoningEffort
         case "gpt-5.4":
@@ -676,6 +760,10 @@ class ThinkingProxy {
             return AppPreferences.sonnet46ThinkingEffort
         }
         return nil
+    }
+
+    private func isOpus47Model(_ model: String) -> Bool {
+        model.contains("opus-4-7")
     }
 
     /// Matches Opus 4.5 (`claude-opus-4-5`, `gemini-claude-opus-4-5`, date-suffixed variants)
@@ -1041,6 +1129,8 @@ class ThinkingProxy {
         }
 
         switch model {
+        case "gpt-5.2":
+            guard AppPreferences.gpt52FastMode else { return nil }
         case "gpt-5.4":
             guard AppPreferences.gpt54FastMode else { return nil }
         case "gpt-5.5":
